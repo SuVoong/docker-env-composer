@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "docker-env-composer"
+version = "0.1.0"
+description = "CLI + TUI para gestionar entornos de desarrollo ERP sobre Docker"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "SuVoong" }]
+keywords = ["odoo", "docker", "database", "development", "tui"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "textual>=1.0.0",
+    "click>=8.1.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+dec = "docker_env_composer.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/docker_env_composer"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/docker_env_composer"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 99
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]

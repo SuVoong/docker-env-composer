@@ -1,0 +1,235 @@
+/* docker-env-composer TUI — spotatui-inspired theme */
+
+/* ── Global ────────────────────────────────────────────────────────── */
+
+Screen {
+    background: #0b0f14;
+    color: #e0e0e0;
+}
+
+Header {
+    color: #1ed760;
+    dock: top;
+    height: 1;
+}
+
+Footer {
+    height: 2;
+    content-align: left middle;
+    padding: 0 1;
+    border-bottom: solid #2a3a4a;
+}
+
+Footer > .footer--key {
+    color: #1ed760;
+}
+
+/* ── Banner ────────────────────────────────────────────────────────── */
+
+#banner {
+    height: auto;
+    width: 100%;
+    content-align: center middle;
+    color: #1ed760;
+    padding: 1 0 0 0;
+}
+
+#banner-subtitle {
+    text-align: center;
+    color: #6b7b8d;
+    text-style: italic;
+    padding-bottom: 1;
+}
+
+/* ── Env info bar ──────────────────────────────────────────────────── */
+
+#env-info {
+    height: 3;
+    padding: 0 2;
+    color: #6b7b8d;
+}
+
+/* ── DataTable ─────────────────────────────────────────────────────── */
+
+DataTable {
+    height: 1fr;
+    margin: 1 2;
+    background: #121820;
+    scrollbar-color: #168c3f;
+    scrollbar-background: #1a2130;
+}
+
+DataTable > .datatable--header {
+    background: #1a2130;
+    color: #1ed760;
+    text-style: bold;
+}
+
+DataTable > .datatable--cursor {
+    background: #1ed760 20%;
+    color: #e0e0e0;
+}
+
+DataTable > .datatable--hover {
+    background: #1a2130;
+}
+
+DataTable:focus > .datatable--cursor {
+    background: #1ed760 35%;
+}
+
+/* ── Status bar ────────────────────────────────────────────────────── */
+
+#status-bar {
+    height: 3;
+    color: #8899aa;
+    content-align: left middle;
+    padding: 0 2;
+    text-style: italic;
+    border-top: solid #2a3a4a;
+    border-bottom: solid #2a3a4a;
+}
+
+#status-msg {
+    color: #6b7b8d;
+    padding: 0 1;
+}
+
+/* ── Dashboard ─────────────────────────────────────────────────────── */
+
+#dashboard-title {
+    text-align: center;
+    text-style: bold;
+    color: #1ed760;
+    padding: 1 0;
+}
+
+/* ── Create Wizard ─────────────────────────────────────────────────── */
+
+#create-container {
+    align: center middle;
+    width: 100%;
+    height: 100%;
+}
+
+#create-form {
+    width: 72;
+    height: auto;
+    max-height: 90%;
+    border: round #168c3f;
+    background: #121820;
+    padding: 1 2;
+}
+
+#form-title {
+    text-align: center;
+    text-style: bold;
+    color: #1ed760;
+    padding-bottom: 1;
+}
+
+#create-form Label {
+    margin-top: 1;
+    color: #6b7b8d;
+}
+
+#create-form Input {
+    background: #1a2130;
+    color: #e0e0e0;
+    border: tall #2a3a4a;
+    margin-bottom: 0;
+}
+
+#create-form Input:focus {
+    border: tall #1ed760;
+}
+
+#create-form Select {
+    background: #1a2130;
+    margin-bottom: 0;
+}
+
+#buttons {
+    margin-top: 2;
+    align: center middle;
+    height: 3;
+}
+
+#buttons Button {
+    margin: 0 2;
+    min-width: 16;
+}
+
+Button.-primary {
+    background: #1ed760;
+    color: #0b0f14;
+    text-style: bold;
+}
+
+Button.-primary:hover {
+    background: #1db954;
+}
+
+Button {
+    background: #1a2130;
+    color: #e0e0e0;
+    border: tall #2a3a4a;
+}
+
+Button:hover {
+    background: #2a3a4a;
+}
+
+/* ── Drop Selector ─────────────────────────────────────────────────── */
+
+#drop-title {
+    text-align: center;
+    text-style: bold;
+    color: #e04040;
+    padding: 1 0;
+}
+
+/* ── Confirm dialog overlay ──────────────────────────────────────── */
+
+#confirm-overlay {
+    align: center middle;
+    width: 100%;
+    height: 100%;
+    background: #0b0f14 80%;
+}
+
+#confirm-dialog {
+    width: 50;
+    height: auto;
+    max-height: 14;
+    border: round #f0b429;
+    background: #121820;
+    padding: 1 2;
+}
+
+#confirm-dialog Static {
+    text-align: center;
+    padding: 1 0;
+}
+
+#confirm-buttons {
+    align: center middle;
+    height: 3;
+    margin-top: 1;
+}
+
+#confirm-buttons Button {
+    margin: 0 2;
+    min-width: 12;
+}
+
+/* ── Selection highlight ─────────────────────────────────────────── */
+
+ListView > ListItem.--highlight {
+    background: #1ed760 20%;
+}
+
+OptionList > .option-list--option-highlighted {
+    background: #1ed760 25%;
+    color: #e0e0e0;
+}

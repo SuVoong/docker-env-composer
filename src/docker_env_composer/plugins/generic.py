@@ -5,8 +5,6 @@ no ERP-specific neutralization.
 """
 
 from __future__ import annotations
-
-from ..core.docker import docker_exec
 from ..core.postgres import PgConfig
 from .base import ERPPlugin
 

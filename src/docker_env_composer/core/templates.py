@@ -11,17 +11,10 @@ import time
 import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING
+from .utils import _elapsed
 
 if TYPE_CHECKING:
     from ..plugins.base import ERPPlugin
-
-
-def _elapsed(start: float) -> str:
-    """Return formatted elapsed time since start."""
-    secs = time.time() - start
-    if secs < 60:
-        return f"{secs:.1f}s"
-    return f"{int(secs // 60)}m {secs % 60:.0f}s"
 
 from .postgres import (
     PgConfig,

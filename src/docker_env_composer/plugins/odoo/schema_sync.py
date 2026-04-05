@@ -27,9 +27,7 @@ import time
 
 import psycopg2
 
-
 def _elapsed(start):
-    """Return formatted elapsed time since start."""
     secs = time.time() - start
     if secs < 60:
         return f"{secs:.1f}s"

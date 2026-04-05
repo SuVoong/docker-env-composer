@@ -13,17 +13,11 @@ from pathlib import Path
 from ...core.docker import docker_cp_to, docker_exec
 from ...core.postgres import PgConfig
 from ...core.sanitize import validate_container_name, validate_db_name, validate_module_list
+from ...core.utils import _elapsed
 from ..base import ERPPlugin
 from . import filestore as _filestore
 from . import neutralize as _neutralize
-from .schema_sync import SCHEMA_SYNC_SCRIPT  # noqa: F401
-
-
-def _elapsed(start: float) -> str:
-    secs = time.time() - start
-    if secs < 60:
-        return f"{secs:.1f}s"
-    return f"{int(secs // 60)}m {secs % 60:.0f}s"
+from .schema_sync import SCHEMA_SYNC_SCRIPT
 
 
 class OdooPlugin(ERPPlugin):

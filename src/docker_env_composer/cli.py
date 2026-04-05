@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
-
 import click
 
 from .core.detect import detect_environment

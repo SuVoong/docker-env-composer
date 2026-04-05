@@ -12,7 +12,7 @@ from textual.widgets import DataTable, Footer, Header, Static
 
 from ...core.detect import get_plugin_for_env
 from ...core.postgres import PgConfig, database_size, drop_database, list_databases
-from ...core.registry import get_database, list_registered, unregister_database
+from ...core.registry import list_registered, unregister_database
 from ..banner import BANNER, BANNER_SUBTITLE
 
 CSS_PATH = Path(__file__).parent.parent / "styles.tcss"
@@ -194,6 +194,3 @@ class DashboardApp(App):
     def action_refresh(self) -> None:
         self._pending_drop = None
         self._load_table()
-
-    def action_create(self) -> None:
-        self.exit(return_code=10)

@@ -178,19 +178,33 @@ def extract_fields(filepath):
     except SyntaxError:
         return
 
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.ClassDef):
-            continue
+    # Collect ClassDef nodes without ast.walk: only top-level + one level
+    # inside if/try/with blocks. ast.walk visits every node in the file
+    # (method bodies, lambdas, comprehensions) which is O(all_nodes) per
+    # file instead of O(top_level_nodes). Multiplied across thousands of
+    # files this dominates the scan time.
+    candidates = [n for n in tree.body if isinstance(n, ast.ClassDef)]
+    for node in tree.body:
+        if isinstance(node, (ast.If, ast.Try, ast.With)):
+            candidates.extend(
+                c for c in ast.iter_child_nodes(node)
+                if isinstance(c, ast.ClassDef)
+            )
 
-        # Collect _name and _inherit for THIS class only
+    for node in candidates:
+        # Single pass over class body: collect model_names and field_items
+        # together instead of two separate iterations over node.body.
         model_names = set()
+        field_items = []  # (field_name, pg_type)
+
         for item in node.body:
             if not isinstance(item, ast.Assign):
                 continue
             for target in item.targets:
                 if not isinstance(target, ast.Name):
                     continue
-                if target.id in ("_name", "_inherit"):
+                tid = target.id
+                if tid in ("_name", "_inherit"):
                     val = item.value
                     s = _get_str_value(val)
                     if s:
@@ -200,29 +214,20 @@ def extract_fields(filepath):
                             s = _get_str_value(elt)
                             if s:
                                 model_names.add(s)
+                elif not tid.startswith("_"):
+                    field_type = _is_fields_call(item.value)
+                    if field_type:
+                        pg_type = FIELD_TYPE_MAP.get(field_type)
+                        if pg_type:
+                            field_items.append((tid, pg_type))
 
-        if not model_names:
+        if not model_names or not field_items:
             continue
 
-        # Collect field assignments for THIS class only
-        for item in node.body:
-            if not isinstance(item, ast.Assign):
-                continue
-            field_type = _is_fields_call(item.value)
-            if not field_type:
-                continue
-            for target in item.targets:
-                if not isinstance(target, ast.Name):
-                    continue
-                field_name = target.id
-                if field_name.startswith("_"):
-                    continue
-                pg_type = FIELD_TYPE_MAP.get(field_type)
-                if not pg_type:
-                    continue
-                for model_name in model_names:
-                    table_name = model_name.replace(".", "_")
-                    yield table_name, field_name, pg_type
+        for model_name in model_names:
+            table_name = model_name.replace(".", "_")
+            for field_name, pg_type in field_items:
+                yield table_name, field_name, pg_type
 
 
 def main():

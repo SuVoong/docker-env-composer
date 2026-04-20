@@ -517,6 +517,44 @@ def main():
                     print(f"    {table}: {count}")
         else:
             print("  No orphan models found")
+
+        # 4h. Clean orphan ir_model_fields on installed models
+        #     (fields added via _inherit by missing modules — not caught by 4c
+        #      because the parent model is not an orphan)
+        cursor.execute(f"""
+            SELECT imf.id, imf.model, imf.name
+            FROM ir_model_fields imf
+            JOIN ir_model_data d ON d.res_id = imf.id
+                AND d.model = 'ir.model.fields'
+                AND d.module IN ({placeholders_str})
+            WHERE NOT EXISTS (
+                SELECT 1 FROM ir_model_data d2
+                WHERE d2.res_id = imf.id
+                    AND d2.model = 'ir.model.fields'
+                    AND d2.module NOT IN ({placeholders_str})
+            )
+        """)
+        orphan_fields = cursor.fetchall()
+        if orphan_fields:
+            fids = ",".join(str(r[0]) for r in orphan_fields)
+            cursor.execute(f"DELETE FROM ir_model_fields WHERE id IN ({fids})")
+            cursor.execute(
+                f"DELETE FROM ir_model_data "
+                f"WHERE model = 'ir.model.fields' AND res_id IN ({fids})"
+            )
+            by_model = {}
+            for _, mname, fname in orphan_fields:
+                by_model.setdefault(mname, []).append(fname)
+            print(f"  Cleaned {len(orphan_fields)} orphan fields on installed models:")
+            for mname in sorted(by_model)[:10]:
+                flds = by_model[mname]
+                if len(flds) <= 3:
+                    print(f"    - {mname}: {', '.join(flds)}")
+                else:
+                    print(f"    - {mname}: {len(flds)} fields")
+            if len(by_model) > 10:
+                print(f"    ... and {len(by_model) - 10} more models")
+
         print(f"  [{_elapsed(t_p3)}]")
     else:
         print(f"  No missing modules — skipped [{_elapsed(t_p3)}]")

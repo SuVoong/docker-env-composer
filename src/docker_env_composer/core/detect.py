@@ -97,7 +97,12 @@ def detect_environment(start_dir: Path | None = None) -> dict | None:
         return None
 
     env["compose_file"] = str(compose_path)
-    # Check both containers in parallel (each has a 5 s timeout).
+    _enrich_with_status(env)
+    return env
+
+
+def _enrich_with_status(env: dict) -> None:
+    """Check container status and add runtime fields to env dict."""
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=2) as executor:
         f_app = executor.submit(check_container_running, env.get("odoo_container", ""))
@@ -106,5 +111,39 @@ def detect_environment(start_dir: Path | None = None) -> dict | None:
         env["pg_running"] = f_pg.result()
     # Backward compat alias
     env["odoo_running"] = env["app_running"]
+
+
+def detect_from_path(path: str) -> dict | None:
+    """Detect a Docker environment from a user-provided path.
+
+    Accepts a directory (looks for docker-compose.yml inside) or a
+    direct path to a compose file.  Returns env dict or None.
+    """
+    p = Path(path).expanduser().resolve()
+
+    if p.is_file():
+        compose_path = p
+    elif p.is_dir():
+        compose_path = find_compose_file(p)
+        if not compose_path:
+            return None
+    else:
+        return None
+
+    env = parse_compose(compose_path)
+    if env is None:
+        return None
+
+    env["compose_file"] = str(compose_path)
+    env["display_name"] = p.name if p.is_file() else p.name
+    # Use parent dir name, skipping 'docker' if present
+    parts = []
+    for part in compose_path.parent.parts:
+        if part == "/":
+            continue
+        parts.append(part)
+    # Use last 2 meaningful parts as display name
+    meaningful = [p for p in parts[-3:] if p.lower() != "docker"]
+    env["display_name"] = "/".join(meaningful) if meaningful else compose_path.parent.name
 
     return env

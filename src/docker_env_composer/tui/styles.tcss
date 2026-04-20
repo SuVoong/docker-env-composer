@@ -223,7 +223,64 @@ Button:hover {
     min-width: 12;
 }
 
-/* ── Selection highlight ─────────────────────────────────────────── */
+/* ── Env Selector ────────────────────────────────────────────────────── */
+
+#env-selector-hint {
+    height: auto;
+    padding: 0 2;
+    color: #f0b429;
+    text-style: italic;
+}
+
+#env-table {
+    height: 1fr;
+    margin: 1 2;
+    background: #121820;
+    scrollbar-color: #168c3f;
+    scrollbar-background: #1a2130;
+}
+
+#add-env-form {
+    width: 72;
+    height: auto;
+    border: round #168c3f;
+    background: #121820;
+    padding: 1 2;
+    margin: 1 2;
+}
+
+#add-env-label {
+    color: #6b7b8d;
+    margin-bottom: 1;
+}
+
+#add-env-input {
+    background: #1a2130;
+    color: #e0e0e0;
+    border: tall #2a3a4a;
+}
+
+#add-env-input:focus {
+    border: tall #1ed760;
+}
+
+#add-env-buttons {
+    margin-top: 1;
+    align: center middle;
+    height: 3;
+}
+
+#add-env-buttons Button {
+    margin: 0 2;
+    min-width: 14;
+}
+
+#add-env-status {
+    color: #6b7b8d;
+    padding: 0 1;
+}
+
+/* ── Selection highlight ─────────────────────────────────────────────────── */
 
 ListView > ListItem.--highlight {
     background: #1ed760 20%;

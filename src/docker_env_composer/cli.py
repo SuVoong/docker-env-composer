@@ -5,15 +5,13 @@ from __future__ import annotations
 import sys
 import click
 
-from .core.detect import detect_environment
 
 
 def _get_env(ctx: click.Context) -> dict:
     """Get the detected environment from context, or fail."""
     env = ctx.obj
     if not env:
-        click.echo("Error: no se detectó docker-compose.yml en el directorio actual ni padres.")
-        click.echo("Ejecuta dec desde el directorio de tu Docker Odoo.")
+        click.echo("Error: no se pudo detectar ningún entorno Docker.")
         sys.exit(1)
     return env
 
@@ -23,7 +21,13 @@ def _get_env(ctx: click.Context) -> dict:
 def main(ctx: click.Context) -> None:
     """dec — Docker Env Composer: gestiona entornos sobre Docker."""
     ctx.ensure_object(dict)
-    env = detect_environment()
+
+    from .tui.app import run_env_selector
+
+    env = run_env_selector()
+    if not env:
+        sys.exit(0)
+
     ctx.obj = env
 
 

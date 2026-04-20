@@ -88,8 +88,8 @@ extra a instalar y TTL (dias hasta expiracion).
 **Via comando directo:**
  
 ```bash
-dec create --name Test_base_loyalty --template test_base --ttl 7
-dec create --name Test_demo --template test_base --modules pos_loyalty,account --ttl 30
+dec create --name Test_base --template test_base --ttl 7
+dec create --name Test_demo --template test_base --modules point_of_sale --ttl 30
 dec create --name prueba_rapida --template test_base --no-tui
 ```
  
@@ -114,9 +114,9 @@ Abre el dashboard con todas las bases de datos registradas:
  
 ```
  Nombre              Descripcion          Version  Template      Creada      Expira          Tamaño
- Test_base_loyalty    Test fidelizacion    16.0     tpv_base      2026-04-01  2026-04-08(3d)  1.2 GB
- Test_demo            Demo cliente X       16.0     tpv_base      2026-04-02  ─               890 MB
- prueba_rapida       (sin registrar)      16.0     ─             ─           ─               234 MB
+ Test_base           Test fidelizacion     16.0     tpv_base      2026-04-01  2026-04-08(3d)  1.2 GB
+ Test_demo           Demo cliente X        16.0     tpv_base      2026-04-02  ─               890 MB
+ prueba_rapida       (sin registrar)       16.0     ─             ─           ─               234 MB
 ```
  
 Acciones desde el dashboard:

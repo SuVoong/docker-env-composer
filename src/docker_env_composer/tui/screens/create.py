@@ -69,14 +69,14 @@ class CreateWizardApp(App):
                 yield Label("Nombre de la base de datos:")
                 yield Input(
                     value=self.initial_name,
-                    placeholder="ej: TPV_test_loyalty",
+                    placeholder="ej: TPV_test",
                     id="db-name",
                 )
 
                 yield Label("Descripción:")
                 yield Input(
                     value=self.initial_desc,
-                    placeholder="ej: Test loyalty cards POS",
+                    placeholder="ej: Test POS",
                     id="db-desc",
                 )
 
@@ -93,7 +93,7 @@ class CreateWizardApp(App):
                 yield Label("Módulos extra (comma-separated):")
                 yield Input(
                     value=self.initial_modules,
-                    placeholder="ej: pos_loyalty,pos_discount",
+                    placeholder="ej: point_of_sale",
                     id="db-modules",
                 )
 

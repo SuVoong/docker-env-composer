@@ -24,6 +24,7 @@ import os
 import re
 import sys
 import time
+from itertools import groupby
 
 import psycopg2
 
@@ -362,15 +363,19 @@ def main():
         added = 0
         errors = 0
         error_details = []
-        for table, column, pg_type in sorted(missing):
+        for table, group in groupby(sorted(missing), key=lambda x: x[0]):
+            cols = list(group)
+            clauses = ", ".join(
+                f'ADD COLUMN IF NOT EXISTS "{col}" {pg_type}'
+                for _, col, pg_type in cols
+            )
             try:
-                cursor.execute(
-                    f'ALTER TABLE "{table}" ADD COLUMN IF NOT EXISTS "{column}" {pg_type};'
-                )
-                added += 1
+                cursor.execute(f'ALTER TABLE "{table}" {clauses};')
+                added += len(cols)
             except Exception as e:
-                errors += 1
-                error_details.append(f"  ! {table}.{column}: {e}")
+                errors += len(cols)
+                for _, col, pg_type in cols:
+                    error_details.append(f"  ! {table}.{col}: {e}")
         # Only print errors (successes are noise at 2000+ columns)
         for line in error_details:
             print(line)
@@ -389,9 +394,8 @@ def main():
             f"FROM ir_ui_view v "
             f"JOIN ir_model_data d ON d.res_id = v.id AND d.model = 'ir.ui.view' "
             f"WHERE d.module IN ({placeholders_str}) "
-            f"AND v.id NOT IN ("
-            f"  SELECT DISTINCT inherit_id FROM ir_ui_view "
-            f"  WHERE inherit_id IS NOT NULL"
+            f"AND NOT EXISTS ("
+            f"  SELECT 1 FROM ir_ui_view c WHERE c.inherit_id = v.id"
             f")"
         )
         orphan_views = cursor.fetchall()
@@ -412,100 +416,6 @@ def main():
     else:
         print(f"Phase 2 (orphan views): no missing modules — skipped [{_elapsed(t_p2)}]")
 
-    # ── Phase 3: Detect inherited views with broken field references ─
-    # Covers the case where a module IS on disk but was updated and
-    # lost a field/view (e.g. stock_available_immediately removed its
-    # settings view but the old view persists in the DB).
-    # Strategy: extract <field name="xxx"> from view arch, cross-check
-    # against ir_model_fields, delete views with missing references.
-    print(f"\n{'─' * 60}")
-    t_p3 = time.time()
-    print("Phase 3 (broken fields): scanning inherited views...")
-    print("  Loading ir_model_fields from DB...")
-
-    cursor.execute("SELECT model, name FROM ir_model_fields")
-    _model_fields = {}
-    for _m, _f in cursor.fetchall():
-        _model_fields.setdefault(_m, set()).add(_f)
-    print(f"  ir_model_fields: {sum(len(v) for v in _model_fields.values())} fields across {len(_model_fields)} models")
-
-    print("  Loading inherited views from DB...")
-    cursor.execute(
-        "SELECT v.id, v.name, v.model, d.module, v.arch_db::text "
-        "FROM ir_ui_view v "
-        "JOIN ir_model_data d ON d.res_id = v.id AND d.model = 'ir.ui.view' "
-        "WHERE v.inherit_id IS NOT NULL AND v.active = true"
-    )
-
-    _rows = cursor.fetchall()
-    print(f"  Inherited views to check: {len(_rows)}")
-    print("  Analyzing view arch for broken field references...")
-    _fre = re.compile(r'<field[^>]*\sname="(\w+)"')
-    _broken = []
-    for _vid, _vn, _vm, _vmod, _arch in _rows:
-        if not _arch or not _vm:
-            continue
-        # arch_db is JSONB — parse to get the XML string
-        try:
-            _d = json.loads(_arch)
-            _xml = next(iter(_d.values())) if isinstance(_d, dict) else _arch
-        except (ValueError, StopIteration):
-            # Fallback: unescape JSONB text representation
-            _xml = _arch.replace('\\"', '"')
-        _refs = set(_fre.findall(_xml))
-        if not _refs:
-            continue
-        _exist = _model_fields.get(_vm)
-        if not _exist:
-            continue
-        _miss = _refs - _exist
-        if _miss:
-            _broken.append((_vid, _vn, _vm, _vmod, _miss))
-
-    if _broken:
-        # Only delete leaf views (no children inheriting from them)
-        _bids = [str(v[0]) for v in _broken]
-        cursor.execute(
-            "SELECT DISTINCT inherit_id FROM ir_ui_view "
-            "WHERE inherit_id IN (" + ",".join(_bids) + ")"
-        )
-        _pids = {str(r[0]) for r in cursor.fetchall()}
-        _safe = [v for v in _broken if str(v[0]) not in _pids]
-        _skip = [v for v in _broken if str(v[0]) in _pids]
-
-        if _safe:
-            _del = ",".join(str(v[0]) for v in _safe)
-            cursor.execute(f"DELETE FROM ir_ui_view WHERE id IN ({_del})")
-            cursor.execute(
-                f"DELETE FROM ir_model_data "
-                f"WHERE model = 'ir.ui.view' AND res_id IN ({_del})"
-            )
-            # Group by module for compact output
-            _by_mod = {}
-            for _vid, _vn, _vm, _vmod, _miss in _safe:
-                _by_mod.setdefault(_vmod, []).append(_vn)
-            print(f"  Cleaned {len(_safe)} views with broken field references:")
-            for _mod in sorted(_by_mod):
-                _views = _by_mod[_mod]
-                if len(_views) <= 2:
-                    for _v in _views:
-                        print(f"    - [{_mod}] {_v}")
-                else:
-                    print(f"    - [{_mod}] {len(_views)} views")
-
-        if _skip:
-            print(f"  ⚠ {len(_skip)} broken views have children (not deleted):")
-            for _vid, _vn, _vm, _vmod, _miss in _skip[:5]:
-                print(f"    ! [{_vmod}] {_vn} ({_vm})")
-            if len(_skip) > 5:
-                print(f"    ... and {len(_skip) - 5} more")
-
-        if not _safe and not _skip:
-            print("  No broken views found")
-        print(f"  [{_elapsed(t_p3)}]")
-    else:
-        print(f"  No broken field references found ✔ [{_elapsed(t_p3)}]")
-
     # ── Phase 4: Clean orphan ir.model and related records ─────────
     # When a module is removed from disk, its Python model classes
     # disappear but ir_model + ir_model_fields + ir_model_access +
@@ -515,8 +425,8 @@ def main():
     # registry (approximated by models that have NO installed module
     # providing them via ir_model_data).
     print(f"\n{'─' * 60}")
-    t_p4 = time.time()
-    print("Phase 4 (orphan models): detecting models from missing modules...")
+    t_p3 = time.time()
+    print("Phase 3 (orphan models): detecting models from missing modules...")
 
     if missing_modules:
         placeholders_str = ",".join(f"'{m}'" for m in sorted(missing_modules))
@@ -602,9 +512,103 @@ def main():
                     print(f"    {table}: {count}")
         else:
             print("  No orphan models found")
+        print(f"  [{_elapsed(t_p3)}]")
+    else:
+        print(f"  No missing modules — skipped [{_elapsed(t_p3)}]")
+
+    # ── Phase 3: Detect inherited views with broken field references ─
+    # Covers the case where a module IS on disk but was updated and
+    # lost a field/view (e.g. stock_available_immediately removed its
+    # settings view but the old view persists in the DB).
+    # Strategy: extract <field name="xxx"> from view arch, cross-check
+    # against ir_model_fields, delete views with missing references.
+    print(f"\n{'─' * 60}")
+    t_p4 = time.time()
+    print("Phase 4 (broken fields): scanning inherited views...")
+    print("  Loading ir_model_fields from DB...")
+
+    cursor.execute("SELECT model, name FROM ir_model_fields")
+    _model_fields = {}
+    for _m, _f in cursor.fetchall():
+        _model_fields.setdefault(_m, set()).add(_f)
+    print(f"  ir_model_fields: {sum(len(v) for v in _model_fields.values())} fields across {len(_model_fields)} models")
+
+    print("  Loading inherited views from DB...")
+    cursor.execute(
+        "SELECT v.id, v.name, v.model, d.module, v.arch_db::text "
+        "FROM ir_ui_view v "
+        "JOIN ir_model_data d ON d.res_id = v.id AND d.model = 'ir.ui.view' "
+        "WHERE v.inherit_id IS NOT NULL AND v.active = true"
+    )
+
+    _rows = cursor.fetchall()
+    print(f"  Inherited views to check: {len(_rows)}")
+    print("  Analyzing view arch for broken field references...")
+    _fre = re.compile(r'<field[^>]*\sname="(\w+)"')
+    _broken = []
+    for _vid, _vn, _vm, _vmod, _arch in _rows:
+        if not _arch or not _vm:
+            continue
+        # arch_db is JSONB — parse to get the XML string
+        try:
+            _d = json.loads(_arch)
+            _xml = next(iter(_d.values())) if isinstance(_d, dict) else _arch
+        except (ValueError, StopIteration):
+            # Fallback: unescape JSONB text representation
+            _xml = _arch.replace('\\"', '"')
+        _refs = set(_fre.findall(_xml))
+        if not _refs:
+            continue
+        _exist = _model_fields.get(_vm)
+        if not _exist:
+            continue
+        _miss = _refs - _exist
+        if _miss:
+            _broken.append((_vid, _vn, _vm, _vmod, _miss))
+
+    if _broken:
+        # Only delete leaf views (no children inheriting from them)
+        _bids = [str(v[0]) for v in _broken]
+        cursor.execute(
+            "SELECT DISTINCT inherit_id FROM ir_ui_view "
+            "WHERE inherit_id IN (" + ",".join(_bids) + ")"
+        )
+        _pids = {str(r[0]) for r in cursor.fetchall()}
+        _safe = [v for v in _broken if str(v[0]) not in _pids]
+        _skip = [v for v in _broken if str(v[0]) in _pids]
+
+        if _safe:
+            _del = ",".join(str(v[0]) for v in _safe)
+            cursor.execute(f"DELETE FROM ir_ui_view WHERE id IN ({_del})")
+            cursor.execute(
+                f"DELETE FROM ir_model_data "
+                f"WHERE model = 'ir.ui.view' AND res_id IN ({_del})"
+            )
+            # Group by module for compact output
+            _by_mod = {}
+            for _vid, _vn, _vm, _vmod, _miss in _safe:
+                _by_mod.setdefault(_vmod, []).append(_vn)
+            print(f"  Cleaned {len(_safe)} views with broken field references:")
+            for _mod in sorted(_by_mod):
+                _views = _by_mod[_mod]
+                if len(_views) <= 2:
+                    for _v in _views:
+                        print(f"    - [{_mod}] {_v}")
+                else:
+                    print(f"    - [{_mod}] {len(_views)} views")
+
+        if _skip:
+            print(f"  ⚠ {len(_skip)} broken views have children (not deleted):")
+            for _vid, _vn, _vm, _vmod, _miss in _skip[:5]:
+                print(f"    ! [{_vmod}] {_vn} ({_vm})")
+            if len(_skip) > 5:
+                print(f"    ... and {len(_skip) - 5} more")
+
+        if not _safe and not _skip:
+            print("  No broken views found")
         print(f"  [{_elapsed(t_p4)}]")
     else:
-        print(f"  No missing modules — skipped [{_elapsed(t_p4)}]")
+        print(f"  No broken field references found ✔ [{_elapsed(t_p4)}]")
 
     # ── Phase 5: Detect and drop spurious columns ──────────────────
     # Previous versions of the schema sync had a cartesian-product bug:
@@ -638,26 +642,39 @@ def main():
     # To be safe, we also check that ir_model_fields does NOT list the
     # column for the model — this avoids dropping columns defined via
     # _fields rather than class-level assignment (e.g. computed fields).
+    # Bulk query 1: todas las columnas de las tablas conocidas de una vez
+    cursor.execute(
+        "SELECT table_name, column_name "
+        "FROM information_schema.columns "
+        "WHERE table_schema = 'public' AND table_name = ANY(%s)",
+        (list(known_tables),)
+    )
+    db_cols_map = {}
+    for tname, cname in cursor.fetchall():
+        db_cols_map.setdefault(tname, set()).add(cname)
+
+    # Bulk query 2: todos los campos de ir_model_fields para los modelos conocidos
+    known_models = [t.replace("_", ".") for t in known_tables]
+    cursor.execute(
+        "SELECT model, name FROM ir_model_fields WHERE model = ANY(%s)",
+        (known_models,)
+    )
+    ir_fields_map = {}
+    for mname, fname in cursor.fetchall():
+        ir_fields_map.setdefault(mname, set()).add(fname)
+
+    py_fields_map = {}
+    col_to_tables = {}
+    for (t, c) in all_fields.keys():
+        py_fields_map.setdefault(t, set()).add(c)
+        col_to_tables.setdefault(c, set()).add(t)
+
     spurious = []
     for table in known_tables:
         model_name = table.replace("_", ".")
-        # Get actual DB columns for this table
-        cursor.execute(
-            "SELECT column_name FROM information_schema.columns "
-            "WHERE table_schema = 'public' AND table_name = %s",
-            (table,)
-        )
-        db_cols = {r[0] for r in cursor.fetchall()}
-
-        # Get fields registered in ir_model_fields for this model
-        cursor.execute(
-            "SELECT name FROM ir_model_fields WHERE model = %s",
-            (model_name,)
-        )
-        ir_fields = {r[0] for r in cursor.fetchall()}
-
-        # Expected columns from Python code
-        py_fields = {col for (t, col) in all_fields.keys() if t == table}
+        db_cols = db_cols_map.get(table, set())
+        ir_fields = ir_fields_map.get(model_name, set())
+        py_fields = py_fields_map.get(table, set())
 
         for col in db_cols:
             if col in CORE_COLUMNS:
@@ -671,12 +688,9 @@ def main():
             # (not a FK or standard column). Check if ANY other table
             # has this column in its Python fields — that's the
             # cartesian-product signature.
-            other_tables = [
-                t for (t, c) in all_fields.keys()
-                if c == col and t != table
-            ]
+            other_tables = col_to_tables.get(col, set()) - {table}
             if other_tables:
-                spurious.append((table, col, other_tables))
+                spurious.append((table, col, sorted(other_tables)))
 
     if spurious:
         dropped = 0
